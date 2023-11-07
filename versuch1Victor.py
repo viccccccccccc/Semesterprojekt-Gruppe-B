@@ -157,7 +157,7 @@ def predict(row, model):
     return yhat
 
 # prepare the data
-path = "C:/Users/Victor/Desktop/Uni/Semesterprojekt/aufgabe1/XFEL_KW0_Results_2.csv"
+path = "XFEL_KW0_Results_2.csv"
 train_dl, test_dl = prepare_data(path)
 print(len(train_dl.dataset), len(test_dl.dataset))
 # define the network

@@ -17,6 +17,9 @@ from torch.nn import BCELoss
 from torch.nn import MSELoss
 from torch.nn.init import kaiming_uniform_
 from torch.nn.init import xavier_uniform_
+from sklearn.metrics import mean_squared_error
+from torchvision import transforms
+from sklearn.preprocessing import StandardScaler
 
 # dataset definition
 class CSVDataset(Dataset):
@@ -56,17 +59,25 @@ class MLP(Module):
     def __init__(self, n_inputs):
         super(MLP, self).__init__()
         # input to first hidden layer
-        self.hidden1 = Linear(n_inputs, 8)
+        self.hidden1 = Linear(n_inputs, 512)
         kaiming_uniform_(self.hidden1.weight, nonlinearity='relu')
         self.act1 = ReLU()
         # second hidden layer
-        self.hidden2 = Linear(8, 8)
+        self.hidden2 = Linear(512, 512)
         kaiming_uniform_(self.hidden2.weight, nonlinearity='relu')
         self.act2 = ReLU()
         # third hidden layer and output
-        self.hidden3 = Linear(8, 6)
-        xavier_uniform_(self.hidden3.weight)
-        self.act3 = Sigmoid()
+        self.hidden3 = Linear(512, 256)
+        kaiming_uniform_(self.hidden3.weight, nonlinearity='relu')
+        self.act3 = ReLU()
+
+        self.hidden4 = Linear(256, 256)
+        kaiming_uniform_(self.hidden4.weight, nonlinearity='relu')
+        self.act4 = ReLU()
+
+        self.hidden5 = Linear(256, 6)
+        kaiming_uniform_(self.hidden5.weight, nonlinearity='relu')
+        self.act5 = ReLU()
 
     # forward propagate input
     def forward(self, X):
@@ -79,6 +90,12 @@ class MLP(Module):
         # third hidden layer and output
         X = self.hidden3(X)
         X = self.act3(X)
+        # third hidden layer and output
+        X = self.hidden4(X)
+        X = self.act4(X)
+        # third hidden layer and output
+        X = self.hidden5(X)
+        X = self.act5(X)
         return X
 
 # prepare the dataset
@@ -86,26 +103,29 @@ def prepare_data(path):
     # load the dataset
     dataset = CSVDataset(path)
 
-    #df = pd.read_csv(path)
-    #df = df.drop(columns='G', errors='ignore')
+    scaler = StandardScaler()
+    features = scaler.fit_transform(features)
 
     # calculate split
     train, test = dataset.get_splits()
     # prepare data loaders
-    train_dl = DataLoader(train, batch_size=32, shuffle=True)
-    test_dl = DataLoader(test, batch_size=1024, shuffle=False)
+    train_dl = DataLoader(train, batch_size=64, shuffle=True)
+    test_dl = DataLoader(test, batch_size=64, shuffle=False)
     return train_dl, test_dl
+
 
 # train the model
 def train_model(train_dl, model):
     # define the optimization
-    sum_loss = 0
+    
     criterion = MSELoss()
-    optimizer = SGD(model.parameters(), lr=0.0005, momentum=0.9)
+    optimizer = SGD(model.parameters(), lr=0.0001, momentum=0.8)
     # enumerate epochs
-    for epoch in range(3):
+    for epoch in range(1):
+        sum_loss = 0
         # enumerate mini batches
-        for i, (inputs, targets) in enumerate(train_dl):
+        #for i, (inputs, targets) in enumerate(train_dl):
+        for (inputs, targets) in (train_dl):
             # clear the gradients
             optimizer.zero_grad()
             # compute the model output
@@ -116,9 +136,8 @@ def train_model(train_dl, model):
             loss.backward()
             # update model weights
             optimizer.step()
-            #print(f'Epoch [{epoch + 1}/{10}], Iteration [{i + 1}/{len(train_dl)}], Loss: {loss.item():.4f}')
-            if i % 10 == 0:  # Print every 10 iterations
-                print(f'Epoch [{epoch + 1}/{3}], Iteration [{i + 1}/{len(train_dl)}], Loss: {loss.item():.4f}') #yhat: {yhat}, targets: {targets}')
+            #if i % 10 == 0:  # Print every 10 iterations
+            print(f'Epoch [{epoch + 1}/{3}], Iteration [{1}/{len(train_dl)}], Loss: {loss.item():.4f}')
 
             sum_loss += loss.item()
 
@@ -143,13 +162,17 @@ def evaluate_model(test_dl, model):
         actuals.append(actual)
     predictions, actuals = vstack(predictions), vstack(actuals)
     # calculate accuracy
-    acc = accuracy_score(actuals, predictions)
-    return acc
+    ###acc = accuracy_score(actuals, predictions)
+    ###return acc
+
+    mse = mean_squared_error(actuals, predictions)
+    return mse
 
 # make a class prediction for one row of data
 def predict(row, model):
     # convert row to data
     row = Tensor([row])
+    row = row[:, :8]
     # make prediction
     yhat = model(row)
     # retrieve numpy array
@@ -157,7 +180,7 @@ def predict(row, model):
     return yhat
 
 # prepare the data
-path = "XFEL_KW0_Results_2.csv"
+path = "C:/Users/Victor/Desktop/Uni/Semesterprojekt/aufgabe1/XFEL_KW0_Results_2.csv"
 train_dl, test_dl = prepare_data(path)
 print(len(train_dl.dataset), len(test_dl.dataset))
 # define the network
@@ -168,6 +191,6 @@ train_model(train_dl, model)
 acc = evaluate_model(test_dl, model)
 print('Accuracy: %.3f' % acc)
 # make a single prediction (expect class=1)
-row = [1,0,0.99539,-0.05889,0.85243,0.02306,0.83398,-0.37708,1,0.03760,0.85243,-0.17755,0.59755,-0.44945,0.60536,-0.38223,0.84356,-0.38542,0.58212,-0.32192,0.56971,-0.29674,0.36946,-0.47357,0.56811,-0.51171,0.41078,-0.46168,0.21266,-0.34090,0.42267,-0.54487,0.18641,-0.45300]
+row = [1, 0, 0.99539, -0.05889, 0.85243, 0.02306, 0.83398, -0.37708, 1, 0.03760, 0.85243, -0.17755, 0.59755, -0.44945, 0.60536, -0.38223, 0.84356, -0.38542, 0.58212, -0.32192, 0.56971, -0.29674, 0.36946, -0.47357, 0.56811, -0.51171, 0.41078, -0.46168, 0.21266, -0.34090, 0.42267, -0.54487, 0.18641, -0.45300]
 yhat = predict(row, model)
-print('Predicted: %.3f (class=%d)' % (yhat, yhat.round()))
+print('Predicted: %.3f (class=%d)' % (yhat[0, 0], yhat.round()[0, 0]))

@@ -118,10 +118,11 @@ def train(train_loader, test_loader):
                 f' Test Loss: {avg_test_loss}, Learning Rate: {optimizer.param_groups[0]["lr"]},'
                 f' Approx. time left: {int(remainig_seconds / 60)} min')
             model.train()
+            np.savez('losses.npz',name1=train_losses,name2=test_losses)
     return train_losses, test_losses
 
 
-def plotte_krasse_sachen(train_loss, test_loss, model, test_input, gold):
+def plotte_krasse_sachen(losses, model, test_input, gold):
     model.eval()
     inputs_torch = torch.from_numpy(test_input).float()
     with torch.no_grad():
@@ -131,9 +132,9 @@ def plotte_krasse_sachen(train_loss, test_loss, model, test_input, gold):
     zeilen, spalten = gold.shape
 
     ax = plt.gca()
-    ax.set_ylim([0, 10 * min([min(train_loss), min(test_loss)])])
-    plt.plot(train_loss, '-b')
-    plt.plot(test_loss, '-g')
+    ax.set_ylim([0, max(losses['name1'])])
+    plt.plot(losses['name1'], '-b')
+    plt.plot(losses['name2'], '-g')
 
     fig, axs = plt.subplots(spalten, figsize=(6, 20))
     for i in range(spalten):
@@ -149,4 +150,4 @@ def plotte_krasse_sachen(train_loss, test_loss, model, test_input, gold):
 
 train_dl, test_dl, tin, tout = prepare_data(1)
 train_l, test_l = train(train_dl, test_dl)
-plotte_krasse_sachen(train_l, test_l, torch.load('model_save.tar'), tin, tout)
+plotte_krasse_sachen(np.load('losses.npz'),torch.load('model_save.tar'), tin, tout)

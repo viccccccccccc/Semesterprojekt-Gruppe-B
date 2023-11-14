@@ -129,6 +129,7 @@ def train(train_loader, test_loader):
 
 def plotte_krasse_sachen(losses, model, test_input, gold):
     model.eval()
+    model= model.to(torch.device('cpu'))        #make sure the model is on the cpu
     inputs_torch = torch.from_numpy(test_input).float()
     with torch.no_grad():
         predictions = model(inputs_torch)

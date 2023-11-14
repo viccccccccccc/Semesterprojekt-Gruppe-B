@@ -10,6 +10,8 @@ import datetime
 
 # Daten laden und löschen konstanter Spalten
 daten = np.delete(np.loadtxt('data.csv', delimiter=','), [6, 8], 1)
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')//init gpu training
+print(device)
 
 anz_input = 7
 anz_output = daten.shape[1] - anz_input
@@ -75,6 +77,7 @@ def train(train_loader, test_loader):
     test_losses = []
     best_model_loss = 1e10
     model = Net()
+    model.to(device)                #move model to gpu
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=init_lr)
     scheduler = ExponentialLR(optimizer, gamma=gamma, verbose=False)
@@ -82,6 +85,7 @@ def train(train_loader, test_loader):
     for epoch in range(epochs):
         loss_sum = 0
         for inputs, labels in train_loader:
+            inputs,labels =inputs.to(device), labels.to(device)#move data to gpu
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
@@ -96,6 +100,7 @@ def train(train_loader, test_loader):
             model.eval()
             with torch.no_grad():
                 for inputs, labels in test_loader:
+                    inputs,labels =inputs.to(device), labels.to(device)#move data to gpu
                     outputs = model(inputs)
                     loss_for_print = criterion(outputs, labels)
                     test_loss += loss_for_print.item()

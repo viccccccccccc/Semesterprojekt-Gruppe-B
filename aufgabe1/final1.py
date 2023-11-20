@@ -27,7 +27,7 @@ batch_size = 128
 test_size = 1. / 3
 
 init_lr = 0.001
-last_lr = 0.00005
+last_lr = 0.000005
 gamma = np.power((last_lr / init_lr), (1 / epochs))  # Gamma wird so gewählt dass init -> last in Trainingszeit
 
 
@@ -197,5 +197,5 @@ def plotte_krasse_sachen(losses, model, test_input, gold):
 
 
 train_dl, test_dl, tin, tout = prepare_data(1)
-#train_l, test_l = train(train_dl, test_dl)
+train_l, test_l = train(train_dl, test_dl)
 plotte_krasse_sachen(np.load(f'losses/losses_{epochs}.npz'),torch.load(f'models/model_save_{epochs}.tar',map_location = torch.device('cpu')), tin, tout)

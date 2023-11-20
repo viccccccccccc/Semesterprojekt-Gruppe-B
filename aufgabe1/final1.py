@@ -22,7 +22,7 @@ anz_output = daten.shape[1] - anz_input
 output_every_k = 1
 inference_points = 20
 
-epochs = 1000
+epochs = 10
 batch_size = 128
 test_size = 1. / 3
 
@@ -119,14 +119,14 @@ def train(train_loader, test_loader):
 
             if avg_test_loss < best_model_loss:
                 best_model_loss = avg_test_loss
-                torch.save(model, 'model_save.tar')
+                torch.save(model, f'models/model_save_{epochs}.tar')
 
             print(
                 f'Epoch: {epoch + 1}/{epochs}, Train Loss: {avg_train_loss},'
                 f' Test Loss: {avg_test_loss}, Learning Rate: {optimizer.param_groups[0]["lr"]},'
                 f' Approx. time left: {int(remainig_seconds / 60)} min')
             model.train()
-            np.savez('losses.npz',name1=train_losses,name2=test_losses)
+            np.savez(f'losses/losses_{epochs}.npz',name1=train_losses,name2=test_losses)
     return train_losses, test_losses
 
 
@@ -144,12 +144,12 @@ def plotte_krasse_sachen(losses, model, test_input, gold):
     ax.set_ylim([0, max(losses['name1'])])
     ax.set_xlabel("Epoch")
     ax.set_ylabel("Loss")
-    ax.set_title("Loss Graphs (500 Epochs)")
+    ax.set_title(f'Loss Graphs ({epochs} Epochs)')
     ax.plot(losses['name1'], '-b',label="Train Losses")
     ax.plot(losses['name2'], '-g',label="Test Losses")
     ax.legend()
 
-    plt.savefig("plots/final_losses_500.png")
+    plt.savefig(f'plots/final_losses_{epochs}.png')
 
     plt.figure(1)
     plt.figure(figsize=(10, 10))
@@ -170,9 +170,9 @@ def plotte_krasse_sachen(losses, model, test_input, gold):
     plt.legend(loc='upper left')
     plt.grid(True)
 
-    plt.savefig("plots/final_inference_500.png")
+    plt.savefig(f'plots/final_inference_{epochs}.png')
 
 
 train_dl, test_dl, tin, tout = prepare_data(1)
 #train_l, test_l = train(train_dl, test_dl)
-plotte_krasse_sachen(np.load('losses/losses500.npz'),torch.load('models/model_save500.tar'), tin, tout)
+plotte_krasse_sachen(np.load(f'losses/losses_{epochs}.npz'),torch.load(f'models/model_save_{epochs}.tar',map_location = torch.device('cpu')), tin, tout)

@@ -54,13 +54,20 @@ test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
 print("dataloader complete")
 class DeconvNet(nn.Module):
-    def init(self):
-        super(DeconvNet, self).init()
-        self.fc = nn.Linear(7, 256*256)
+    def __init__(self):
+        super(DeconvNet, self).__init__()
+        self.fc = nn.Linear(7, 256)
+        self.deconv1 = nn.ConvTranspose2d(16, 32, kernel_size=3, stride=2, padding=1, output_padding=1)
+        self.deconv2 = nn.ConvTranspose2d(32, 64, kernel_size=3, stride=2, padding=1, output_padding=1)
+        self.deconv3 = nn.ConvTranspose2d(64, 1, kernel_size=3, stride=2, padding=1, output_padding=1)
+        self.relu = nn.ReLU()
 
     def forward(self, x):
-        x = self.fc(x)
-        x = x.view(-1, 1, 256, 256)
+        x = self.relu(self.fc(x))
+        x = x.view(x.size(0), 16, 4, 4)  # reshape to match the shape needed for the first deconvolution layer
+        x = self.relu(self.deconv1(x))
+        x = self.relu(self.deconv2(x))
+        x = self.relu(self.deconv3(x))
         return x
 
 

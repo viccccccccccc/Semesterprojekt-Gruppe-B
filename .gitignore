@@ -2,3 +2,5 @@
 *.tar
 *.npz
 *.h5
+*.npy
+*.pth

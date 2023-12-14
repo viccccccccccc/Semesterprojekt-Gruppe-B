@@ -141,7 +141,7 @@ def train(train_loader, test_loader):
 
 
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') #init gpu training
+device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu') #init gpu training
 print(device)
 # Liest die Daten in den DataLoader
 train_dataset, test_dataset = train_test_split(1./3, "data.h5")

@@ -1,6 +1,6 @@
 *.csv
 *.tar
-*.npz
+losses*.npz
 *.h5
 *.npy
 *.pth

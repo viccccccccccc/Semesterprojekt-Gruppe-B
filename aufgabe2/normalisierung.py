@@ -66,6 +66,7 @@ def find_max(h5_reader):
         x, y = h5_reader[i]
         x_max = [max(ai, bi) for ai, bi in zip(x_max, x)]
         y_max = [max(ai, bi) for ai, bi in zip(y_max, y)]
+        print(i)
     return x_max, y_max
 
 
@@ -95,6 +96,6 @@ print(x_maximum)
 print(len(y_maximum))
 print(y_maximum)
 
-train_dataset, test_dataset = train_test_split(1. / 3, "data.h5")
-train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+#train_dataset, test_dataset = train_test_split(1. / 3, "data.h5")
+#train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+#test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)

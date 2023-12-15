@@ -38,15 +38,13 @@ class H5Reader:
         datapoint = self.file[self.key_list[idx]]
         x = datapoint["X"][:7]
         y = (datapoint["Y"][:][:]).flatten()
+        x_div = x
+        y_div = y
         if self.active_normalize:
-            x_div = []
-            y_div = []
-            np.divide(x, self.x_max, x_div)
-            np.divide(y, self.y_max, y_div)
-            x = x_div
-            y = y_div
-
-        return x, y
+            print("Let's normalize")
+            x_div = np.divide(x, self.x_max)
+            y_div = np.divide(y, self.y_max)
+        return x_div, y_div
 
     def normalize(self, x_max, y_max):
         self.active_normalize = True
@@ -88,14 +86,15 @@ def train_test_split(anteil_test, hdf5_path):
     return CustomDataset(0, split_index, reader), CustomDataset(split_index, len(reader), reader)
 
 
-test_reader = H5Reader("data.h5")
-x_maximum, y_maximum = find_max(test_reader)
+#test_reader = H5Reader("data.h5")
+#x_maximum, y_maximum = find_max(test_reader)
 
-print(len(x_maximum))
-print(x_maximum)
-print(len(y_maximum))
-print(y_maximum)
+#print(len(x_maximum))
+#print(x_maximum)
+#print(len(y_maximum))
+#print(y_maximum)
 
 #train_dataset, test_dataset = train_test_split(1. / 3, "data.h5")
 #train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 #test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+

@@ -6,4 +6,4 @@
 
 module load cuda
 
-python3 versuch2.4.py
+python3 versuch2.3.py

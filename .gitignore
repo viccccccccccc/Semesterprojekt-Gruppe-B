@@ -4,3 +4,4 @@ losses*.npz
 *.h5
 *.npy
 *.pth
+*.out

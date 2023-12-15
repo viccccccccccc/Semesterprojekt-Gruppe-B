@@ -54,7 +54,7 @@ def train_test_split(anteil_test, hdf5_path):
 
 
 # Liest die Daten in den DataLoader
-device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu') #init gpu training
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') #init gpu training
 print(device)
 train_dataset, test_dataset = train_test_split(1./3, "data.h5")
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)

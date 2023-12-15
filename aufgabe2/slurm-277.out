@@ -1,0 +1,24 @@
+/vol/fob-vol7/mi21/blumenca/.local/lib/python3.6/site-packages/torch/cuda/__init__.py:143: UserWarning: 
+NVIDIA A100 80GB PCIe with CUDA capability sm_80 is not compatible with the current PyTorch installation.
+The current PyTorch install supports CUDA capabilities sm_37 sm_50 sm_60 sm_70.
+If you want to use the NVIDIA A100 80GB PCIe GPU with PyTorch, please check the instructions at https://pytorch.org/get-started/locally/
+
+  warnings.warn(incompatible_device_warn.format(device_name, capability, " ".join(arch_list), device_name))
+cuda
+datensatz geladen und gesplittet!
+Traceback (most recent call last):
+  File "versuch2.3.py", line 80, in <module>
+    model.to(device)                #move model to gpu
+  File "/vol/fob-vol7/mi21/blumenca/.local/lib/python3.6/site-packages/torch/nn/modules/module.py", line 899, in to
+    return self._apply(convert)
+  File "/vol/fob-vol7/mi21/blumenca/.local/lib/python3.6/site-packages/torch/nn/modules/module.py", line 570, in _apply
+    module._apply(fn)
+  File "/vol/fob-vol7/mi21/blumenca/.local/lib/python3.6/site-packages/torch/nn/modules/module.py", line 570, in _apply
+    module._apply(fn)
+  File "/vol/fob-vol7/mi21/blumenca/.local/lib/python3.6/site-packages/torch/nn/modules/module.py", line 593, in _apply
+    param_applied = fn(param)
+  File "/vol/fob-vol7/mi21/blumenca/.local/lib/python3.6/site-packages/torch/nn/modules/module.py", line 897, in convert
+    return t.to(device, dtype if t.is_floating_point() or t.is_complex() else None, non_blocking)
+RuntimeError: CUDA error: out of memory
+CUDA kernel errors might be asynchronously reported at some other API call,so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1.

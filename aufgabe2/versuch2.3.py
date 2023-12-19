@@ -7,7 +7,7 @@ import random
 
 
 ### Hyperparamaters ###
-batch_size = 64
+batch_size = 1
 anteil_test = 0.2
 output_size = 256*256
 num_epochs = 10
@@ -57,8 +57,8 @@ def train_test_split(anteil_test, hdf5_path):
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') #init gpu training
 print(device)
 train_dataset, test_dataset = train_test_split(1./3, "data.h5")
-train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size,num_workers= 1 if device==torch.device('cpu') else 2, shuffle=True)
+test_dataloader = DataLoader(test_dataset, batch_size=batch_size,num_workers=1 if device==torch.device('cpu') else 2, shuffle=False)
 print("datensatz geladen und gesplittet!")
 
 
@@ -79,7 +79,6 @@ class MLP(nn.Module):
 model = MLP()
 model.to(device)                #move model to gpu
 criterion = nn.MSELoss()
-criterion.to(device)
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 print("anfang")
@@ -87,10 +86,19 @@ print("anfang")
 for epoch in range(num_epochs):
     for inputs, labels in train_dataloader:
         labels = labels.view(labels.size(0), -1)    #labels von (256, 256) auf 1D flatten
-        inputs,labels =inputs.to(device), labels.to(device)#move data to gpu
+        inputs = inputs.to(device) #move data to gpu
+        #labels = labels.to(device)
         optimizer.zero_grad()
-        outputs = model(inputs)
+        outputs = model(inputs).cpu()
+        #outputs.to('cpu')
+        #labels.to('cpu')
+        #criterion.to('cpu')
+        #print(outputs.get_device())
+        #print(outputs.get_device())
+        #print(criterion.get_device())
+        
         loss = criterion(outputs, labels)
+        #loss = loss.cpu()
         loss.backward()
         optimizer.step()
 

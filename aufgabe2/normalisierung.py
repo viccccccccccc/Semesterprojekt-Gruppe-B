@@ -70,15 +70,15 @@ def find_max(h5_reader):
 
 def train_test_split(anteil_test, hdf5_path):
     reader = H5Reader(hdf5_path)
-    if os.path.exists('max_values/x.npz') and os.path.exists('max_values/y.npz'):
-        x_max = np.load(f'max_values/x.npz')
-        y_max = np.load(f'max_values/y.npz')
+    if os.path.exists('max_valuesLoc/x.npz') and os.path.exists('max_valuesLoc/y.npz'):
+        x_max = np.load(f'max_valuesLoc/x.npz')
+        y_max = np.load(f'max_valuesLoc/y.npz')
         x_max = x_max['name1']
         y_max = y_max['name1']
     else:
         x_max, y_max = find_max(reader)
-        np.savez(f'max_values/x.npz', name1=x_max)
-        np.savez(f'max_values/y.npz', name1=y_max)
+        np.savez(f'max_valuesLoc/x.npz', name1=x_max)
+        np.savez(f'max_valuesLoc/y.npz', name1=y_max)
     print(x_max)
     print(y_max)
     reader.normalize(x_max, y_max)
@@ -94,7 +94,7 @@ def train_test_split(anteil_test, hdf5_path):
 #print(len(y_maximum))
 #print(y_maximum)
 
-#train_dataset, test_dataset = train_test_split(1. / 3, "data.h5")
+train_dataset, test_dataset = train_test_split(1. / 3, "data2m.h5")
 #train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 #test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 

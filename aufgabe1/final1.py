@@ -22,12 +22,12 @@ anz_output = daten.shape[1] - anz_input
 output_every_k = 1
 inference_points = 20
 
-epochs = 10
+epochs = 450
 batch_size = 128
 test_size = 1. / 3
 
 init_lr = 0.001
-last_lr = 0.0001
+last_lr = 0.000005
 gamma = np.power((last_lr / init_lr), (1 / epochs))  # Gamma wird so gewählt dass init -> last in Trainingszeit
 
 
@@ -122,8 +122,8 @@ def train(train_loader, test_loader):
                 torch.save(model, f'models/model_save_{epochs}.tar')
 
             print(
-                f'Epoch: {epoch + 1}/{epochs}, Train Loss: {avg_train_loss},'
-                f' Test Loss: {avg_test_loss}, Learning Rate: {optimizer.param_groups[0]["lr"]},'
+                f'Epoch: {epoch + 1}/{epochs}, Train Loss: {format(avg_train_loss,".8f")},'
+                f' Test Loss: {format(avg_test_loss,".8f")}, Learning Rate: {format(optimizer.param_groups[0]["lr"],".8f")},'
                 f' Approx. time left: {int(remainig_seconds / 60)} min')
             model.train()
             np.savez(f'losses/losses_{epochs}.npz',name1=train_losses,name2=test_losses)
@@ -172,7 +172,30 @@ def plotte_krasse_sachen(losses, model, test_input, gold):
 
     plt.savefig(f'plots/final_inference_{epochs}.png')
 
+    plt.figure(1)
+    plt.figure(figsize=(10, 10))
+    colors = ['b', 'g', 'r', 'c', 'm']  # Farben für die Labels
+    label_names = ['Label 1', 'Label 2', 'Label 3', 'Label 4', 'Label 5']  # Namen der Labels
+
+
+    diff = gold-prediction
+    for j in range(spalten):
+
+        plt.scatter(np.full((1,zeilen),j+1), diff[:, j], c=colors[j], s=10, label=label_names[j])
+
+
+    plt.xlabel('Param')
+    plt.ylabel('Gold-Prediction')
+    plt.title('Scatter plot of Gold Prediction Difference')
+    plt.legend(loc='upper left')
+    plt.grid(True)
+
+    plt.savefig(f'plots/final_inference_difference_{epochs}.png')
+
+
+
+
 
 train_dl, test_dl, tin, tout = prepare_data(1)
-#train_l, test_l = train(train_dl, test_dl)
+train_l, test_l = train(train_dl, test_dl)
 plotte_krasse_sachen(np.load(f'losses/losses_{epochs}.npz'),torch.load(f'models/model_save_{epochs}.tar',map_location = torch.device('cpu')), tin, tout)

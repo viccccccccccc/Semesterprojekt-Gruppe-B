@@ -1,3 +1,4 @@
+import datetime
 import numpy as np
 import torch
 import torch.nn as nn
@@ -8,11 +9,12 @@ import random
 import os
 
 ### Hyperparamaters ###
-batch_size = 64
+batch_size = 2
 anteil_test = 0.2
 output_size = 256*256
 num_epochs = 50
-
+save_every_k = 10
+test_train_split = 1./5
 #######################
 
 
@@ -95,45 +97,94 @@ class H5Reader:
 
 
 
+
+
+class DeconvNet(nn.Module):
+    def __init__(self):
+        super(DeconvNet, self).__init__()
+        self.fc = nn.Linear(7, 256)  # Fully connected layer
+        self.relu = nn.ReLU()  # Activation function
+        self.deconv1 = nn.ConvTranspose2d(1, 1, kernel_size=4, stride=2, padding=1) # Deconvolution layer
+        self.deconv2 = nn.ConvTranspose2d(1, 1, kernel_size=4, stride=2, padding=1)  # Deconvolution layer
+        self.deconv3 = nn.ConvTranspose2d(1, 1, kernel_size=4, stride=2, padding=1)  # Deconvolution layer
+        self.deconv4 = nn.ConvTranspose2d(1, 1, kernel_size=4, stride=2, padding=1)  # Deconvolution layer
+
+    def forward(self, x):
+        x = self.relu(self.fc(x))
+        x = x.view(x.size(0), 1, 16, 16)  # reshape to match the shape needed for the first deconvolution layer
+        x = self.relu(self.deconv1(x))
+        x = self.relu(self.deconv2(x))
+        x = self.relu(self.deconv3(x))
+        x = self.deconv4(x)
+        #for element in x: element.flatten()
+        x=x.view(x.size(0),output_size)
+        return x
+    
+
+def train():
+    model = DeconvNet()
+    model.to(device)
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    last_time = datetime.datetime.now()
+    run_directory = last_time.strftime("%d.%m.%y, %H:%M:%S")
+    os.mkdir(run_directory)
+    train_losses = []
+    test_losses = []
+    best_model_loss = 1e10
+
+    print("anfang")
+    
+    for epoch in range(num_epochs):
+        loss_sum = 0
+        for inputs, labels in train_dataloader:
+            inputs = inputs.float()
+            labels = labels.float()
+            inputs = inputs.to(device)
+            optimizer.zero_grad()
+            outputs = model(inputs).cpu()
+            loss = criterion(outputs, labels)
+            loss_sum += loss.item()
+            loss.backward()
+            optimizer.step()
+
+        
+        now = last_time
+        last_time = datetime.datetime.now()
+        timediff = last_time - now
+        minutes = timediff.total_seconds()/60
+        remainig_minutes = minutes * (num_epochs - epoch)
+
+        print(f'Epoch {epoch+1} from {num_epochs}, Loss: {loss.item()}, Aprox. Time left: {remainig_minutes}')
+
+        if((epoch+1)%save_every_k==0):
+            test_loss = 0.0
+            model.eval()
+            with torch.no_grad():
+                for inputs, labels in test_dataloader:
+                    inputs,labels =inputs.to(device), labels.to(device)#move data to gpu
+                    outputs = model(inputs)
+                    loss_for_print = criterion(outputs, labels)
+                    test_loss += loss_for_print.item()
+            avg_train_loss = loss_sum / len(train_dataloader)
+            avg_test_loss = test_loss / len(test_dataloader)
+            train_losses.append(avg_train_loss)
+            test_losses.append(avg_test_loss)
+
+            if avg_test_loss < best_model_loss:
+                best_model_loss = avg_test_loss
+                torch.save(model, f'{run_directory}/model_best.tar')
+            torch.save(model, f'{run_directory}/model_{epoch+1}.tar')
+    np.savez(f'{run_directory}/losses.npz',name1=train_losses,name2=test_losses)
+
+
 device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
 print(device)
 reader = H5Reader("data.h5")
 reader.normalize()
-train_dataset, test_dataset = reader.split(1. / 3)
+train_dataset, test_dataset = reader.split(test_train_split)
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size,  num_workers=72, shuffle=True)
 test_dataloader = DataLoader(test_dataset, batch_size=batch_size,num_workers=72, shuffle=False)
 print("datensatz geladen und gesplittet!")
 
-class MLP(nn.Module):
-    def __init__(self):
-        super(MLP, self).__init__()
-        self.layers = nn.Sequential(
-            nn.Linear(7, 128),
-            nn.ReLU(),
-            nn.Linear(128, 256),
-            nn.ReLU(),
-            nn.Linear(256, output_size)
-        )
-
-    def forward(self, x):
-        return self.layers(x)
-
-model = MLP()
-model.to(device)
-criterion = nn.MSELoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-print("anfang")
-
-for epoch in range(num_epochs):
-    for inputs, labels in train_dataloader:
-        inputs = inputs.float()
-        labels = labels.float()
-        inputs = inputs.to(device)
-        optimizer.zero_grad()
-        outputs = model(inputs).cpu()
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
-
-    print(f'Epoch {epoch+1}, Loss: {loss.item()}')
+train()

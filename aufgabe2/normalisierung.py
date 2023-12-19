@@ -6,18 +6,15 @@ from torch.utils.data import Dataset, DataLoader
 
 
 class CustomDataset(Dataset):
-    def __init__(self, min_idx, excluded_max, reader):
-        self.reader = reader
-        self.min = min_idx
-        self.max = excluded_max
+    def __init__(self, my_reader, key_list):
+        self.reader = my_reader
+        self.key_list = key_list
 
     def __len__(self):
-        return self.max - self.min
+        return len(self.key_list)
 
     def __getitem__(self, idx):
-        if self.min + idx >= self.max:
-            raise Exception("Out of Bounds")
-        return self.reader[self.min + idx]
+        return self.reader[self.key_list[idx]]
 
 
 class H5Reader:
@@ -27,26 +24,27 @@ class H5Reader:
         self.active_normalize = False
         self.x_max = []
         self.y_max = []
-        random.shuffle(self.key_list)
 
     def __len__(self):
         return len(self.key_list)
 
     def __getitem__(self, idx):
-        if idx >= len(self.key_list):
-            raise Exception("Out of Bounds")
-        datapoint = self.file[self.key_list[idx]]
+        if isinstance(idx, str):
+            datapoint = self.file[idx]
+        else:
+            datapoint = self.file[self.key_list[idx]]
+
         x = datapoint["X"][:7]
         y = (datapoint["Y"][:][:]).flatten()
         x_div = x
         y_div = y
         if self.active_normalize:
-            print("Let's normalize")
             x_div = np.divide(x, self.x_max)
             y_div = np.divide(y, self.y_max)
         return x_div, y_div
 
-    def normalize(self, x_max, y_max):
+    def normalize(self):
+        x_max, y_max = self.find_max()
         self.active_normalize = True
         for i in range(len(x_max)):
             if x_max[i] == 0:

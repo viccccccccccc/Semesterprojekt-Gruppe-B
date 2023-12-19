@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --job-name=SemesterprojectKIGruppeB
-#SBATCH --nodes=4
-#SBATCH --gres=gpu:rtx6000
+#SBATCH --nodes=1
+#SBATCH --gres=gpu
 
 module load cuda
 

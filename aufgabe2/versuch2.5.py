@@ -13,7 +13,7 @@ batch_size = 2
 anteil_test = 0.2
 output_size = 256*256
 num_epochs = 50
-save_every_k = 10
+save_every_k = 2
 test_train_split = 1./5
 #######################
 
@@ -140,6 +140,7 @@ def train():
         for inputs, labels in train_dataloader:
             inputs = inputs.float()
             labels = labels.float()
+            #print(inputs.size())
             inputs = inputs.to(device)
             optimizer.zero_grad()
             outputs = model(inputs).cpu()
@@ -162,13 +163,17 @@ def train():
             model.eval()
             with torch.no_grad():
                 for inputs, labels in test_dataloader:
-                    inputs,labels =inputs.to(device), labels.to(device)#move data to gpu
-                    outputs = model(inputs)
+                    labels = labels.float()
+                    inputs = inputs.float()
+                    #print(inputs.size())
+                    inputs =inputs.to(device),#move data to gpu
+                    #optimizer.zero_grad()
+                    outputs = model(inputs).cpu()
                     loss_for_print = criterion(outputs, labels)
                     test_loss += loss_for_print.item()
             avg_train_loss = loss_sum / len(train_dataloader)
             avg_test_loss = test_loss / len(test_dataloader)
-            train_losses.append(avg_train_loss)
+            train_losses.append(avg_train_loss)          
             test_losses.append(avg_test_loss)
 
             if avg_test_loss < best_model_loss:

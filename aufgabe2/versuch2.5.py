@@ -166,7 +166,7 @@ def train():
                     labels = labels.float()
                     inputs = inputs.float()
                     #print(inputs.size())
-                    inputs =inputs.to(device),#move data to gpu
+                    inputs =inputs.to(device)#move data to gpu
                     #optimizer.zero_grad()
                     outputs = model(inputs).cpu()
                     loss_for_print = criterion(outputs, labels)

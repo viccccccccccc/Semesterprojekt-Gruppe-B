@@ -189,9 +189,9 @@ def train():
     np.savez(f'{run_directory}/losses.npz',name1=train_losses,name2=test_losses)
 
 
-device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu')
 print(device)
-reader = H5Reader("data.h5")
+reader = H5Reader("data2m.h5")
 reader.normalize()
 train_dataset, test_dataset = reader.split(test_train_split)
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size,  num_workers=72, shuffle=True)

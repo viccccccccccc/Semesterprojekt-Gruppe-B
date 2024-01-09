@@ -209,7 +209,7 @@ def train():
     np.savez(f'{run_directory}/losses.npz', train_losses=train_losses, test_losses=test_losses)
 
 
-device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(device)
 reader = H5Reader("/glusterfs/dfs-gfs-dist/feuforsp/rzp-1_sphere1mm_train_2million_bin32.h5")
 reader.normalize()

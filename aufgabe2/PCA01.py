@@ -71,7 +71,7 @@ class CustomDataset(Dataset):
     
 batch_size = 1024
 num_epochs = 500
-save_every_k = 1
+save_every_k = 10
 init_lr = 0.001
 
 class MLP(nn.Module):

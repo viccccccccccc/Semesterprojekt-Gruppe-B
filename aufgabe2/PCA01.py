@@ -1,3 +1,4 @@
+import random
 from sklearn.preprocessing import MinMaxScaler
 import h5py
 from torch.utils.data import Dataset
@@ -14,6 +15,11 @@ import joblib
 import datetime
 import numpy as np
 
+batch_size = 64
+num_epochs = 500
+save_every_k = 10
+init_lr = 0.001
+test_train_split = 1./5
 
 class CustomDataset(Dataset):
     def __init__(self, hdf5_path):
@@ -55,8 +61,11 @@ class CustomDataset(Dataset):
         return len(self.key_list)
 
     def __getitem__(self, idx):
+        if isinstance(idx, str):
+            datapoint = self.file[idx]
+        else:
+            datapoint = self.file[self.key_list[idx]]
 
-        datapoint = self.file[self.key_list[idx]]
         x = datapoint["X"][:7]
         y = (datapoint["Y"][:][:]).flatten()
 
@@ -69,24 +78,48 @@ class CustomDataset(Dataset):
 
         return x, y
     
-batch_size = 1024
-num_epochs = 500
-save_every_k = 10
-init_lr = 0.001
+    def split(self, anteil_test):
+        keys = self.key_list.copy()
+        random.shuffle(keys)
+        split_index = int(len(keys) * anteil_test)
+        test = keys[:split_index]
+        train = keys[split_index:]
+
+        return CustomDataset2(self, train), CustomDataset2(self, test)
+    
+class CustomDataset2(Dataset):
+    def __init__(self, my_reader, key_list):
+        self.reader = my_reader
+        self.key_list = key_list
+
+    def __len__(self):
+        return len(self.key_list)
+
+    def __getitem__(self, idx):
+        return self.reader[self.key_list[idx]]
+    
+    
+
 
 class MLP(nn.Module):
     def __init__(self):
         super(MLP, self).__init__()
         self.fc = nn.Sequential(
-            nn.Linear(7, 16),
-            nn.Linear(16, 32),
+            nn.Linear(7, 32),
             nn.LeakyReLU(),
-            nn.Linear(32, 64),
+            nn.Linear(32, 128),
             nn.LeakyReLU(),
-            nn.Linear(64, 128),
+            nn.Linear(128, 512),
             nn.LeakyReLU(),
-            nn.Linear(128, 256),
-            nn.Sigmoid(),
+            nn.Linear(512, 2048),
+            nn.LeakyReLU(),
+            nn.Linear(2048, 8192),
+            nn.LeakyReLU(),
+            nn.Linear(8192, 32768),
+            nn.LeakyReLU(),
+            nn.Linear(32768, 4096),
+            nn.LeakyReLU(),
+            nn.Linear(4096, 256),
     
         )
 
@@ -157,11 +190,12 @@ def train():
     np.savez(f'{run_directory}/losses.npz',name1=train_losses,name2=test_losses)
 
 
-device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(device)
 data = CustomDataset("../../../../../../../../../glusterfs/dfs-gfs-dist/gruppe_b/pca256.h5")
 data.normalize()
-train_dataloader = DataLoader(data, batch_size=batch_size,  num_workers=72, shuffle=True)
-test_dataloader = DataLoader(data, batch_size=batch_size,num_workers=72, shuffle=False)
+train_data, test_data = data.split(test_train_split)
+train_dataloader = DataLoader(train_data, batch_size=batch_size,  num_workers=72, shuffle=True)
+test_dataloader = DataLoader(test_data, batch_size=batch_size,num_workers=72, shuffle=False)
 print("datensatz geladen und gesplittet!")
 train()

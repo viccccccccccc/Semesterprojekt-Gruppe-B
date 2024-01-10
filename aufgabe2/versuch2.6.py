@@ -4,18 +4,21 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
+from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import ExponentialLR
+import matplotlib.pyplot as plt
 import h5py
 import random
 import os
 
 ### Hyperparamaters ###
-batch_size = 64
+batch_size = 256
 anteil_test = 0.2
-output_size = 256*256
-num_epochs = 600
-save_every_k = 10
+output_size = 64*64
+num_epochs = 50
+save_every_k = 2
 test_train_split = 1./5
-init_lr = 0.01
+learning_rate = 0.001
 #######################
 
 
@@ -80,14 +83,14 @@ class H5Reader:
         return CustomDataset(self, train), CustomDataset(self, test)
 
     def find_max(self):
+        if not os.path.exists('max_values'):
+            os.makedirs('max_values')
         if os.path.exists('max_values/x.npz') and os.path.exists('max_values/y.npz'):
             x_max = np.load(f'max_values/x.npz')
             y_max = np.load(f'max_values/y.npz')
             x_max = x_max['name1']
             y_max = y_max['name1']
         else:
-            if not(os.path.exists('max_values/')):
-                os.mkdir('max_values/')
             x_max, y_max = self[0]
             for i in range(len(self)):
                 x, y = self[i]
@@ -102,7 +105,7 @@ class H5Reader:
 
 
 
-class DeconvNet(nn.Module):
+"""class DeconvNet(nn.Module):
     def __init__(self):
         super(DeconvNet, self).__init__()
         self.fc = nn.Linear(7, 256)  # Fully connected layer
@@ -121,81 +124,120 @@ class DeconvNet(nn.Module):
         x = self.deconv4(x)
         #for element in x: element.flatten()
         x=x.view(x.size(0),output_size)
+        return x"""
+
+
+class DeconvNet(nn.Module):
+    def __init__(self):
+        super(DeconvNet, self).__init__()
+        self.initial_shape = (8, 8)  # Example shape
+        self.initial_channels = 1
+        self.fc_input_size = self.initial_channels * self.initial_shape[0] * self.initial_shape[1]
+        self.fc = nn.Linear(7, self.fc_input_size)
+        self.deconv_layers = nn.Sequential(
+            nn.ConvTranspose2d(1, 32, kernel_size=4, stride=2, padding=1),    # Output: [batch_size, 32, 16, 16]
+            nn.ReLU(),
+            nn.ConvTranspose2d(32, 16, kernel_size=4, stride=2, padding=1),   # Output: [batch_size, 16, 32, 32]
+            nn.ReLU(),
+            nn.ConvTranspose2d(16, 8, kernel_size=4, stride=2, padding=1),    # Output: [batch_size, 8, 64, 64]
+            nn.ReLU(),
+            nn.ConvTranspose2d(8, 1, kernel_size=4, stride=2, padding=1),     # Output: [batch_size, 1, 256, 256]
+            nn.Tanh()
+        )
+
+    def forward(self, x):
+        x = self.fc(x)
+        x = x.view(-1, self.initial_channels, self.initial_shape[0], self.initial_shape[1])
+        x = self.deconv_layers(x)
+        x = x.view(x.size(0), -1)
         return x
     
+def calculate_accuracy(outputs, labels, threshold=0.05):
+    correct = (torch.abs(outputs - labels) <= threshold).float()  
+    accuracy = correct.mean().item()
+    return accuracy
 
 def train():
     model = DeconvNet()
     model.to(device)
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr = init_lr)
-    schedular = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min')
-    last_time = datetime.datetime.now()
-    run_directory = last_time.strftime("%d.%m.%y, %H:%M:%S")
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    scheduler = ExponentialLR(optimizer, gamma=0.1)
     os.mkdir(run_directory)
     train_losses = []
     test_losses = []
-    best_model_loss = 1e10
 
     print("anfang")
+    last_time = datetime.datetime.now()
+    run_directory = last_time.strftime("%d.%m.%y, %H:%M:%S")
     
     for epoch in range(num_epochs):
-        loss_sum = 0
-        #loss_sum = loss_sum.to(device)
+        model.train()
+        epoch_train_loss = 0
         for inputs, labels in train_dataloader:
-            #print(inputs.size())
-            inputs, labels = inputs.to(device), labels.to(device)
-            inputs = inputs.float()
-            labels = labels.float()
+            inputs = inputs.float().to(device)
+            labels = labels.float().to(device)
+            labels = labels.view(-1, 4096)
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
-            loss = loss
-            loss_sum += loss.item()
+            epoch_train_loss += loss.item()
             loss.backward()
             optimizer.step()
-            schedular.step(loss)
-        #loss_sum = loss_sum.cpu()
-        
+
+        epoch_train_loss /= len(train_dataloader)
+        train_losses.append(epoch_train_loss)
+
         now = last_time
         last_time = datetime.datetime.now()
         timediff = last_time - now
         minutes = timediff.total_seconds()/60
         remainig_minutes = minutes * (num_epochs - epoch)
 
-        print(f'Epoch {epoch+1} from {num_epochs}, Loss: {loss.item()}, Aprox. Time left: {remainig_minutes}min')
+        model.eval()
+        epoch_test_loss = 0
+        total_accuracy = 0
+        with torch.no_grad():
+            for inputs, labels in test_dataloader:
+                inputs = inputs.float().to(device)
+                labels = labels.float().to(device)
+                labels = labels.view(-1, 4096)
+                outputs = model(inputs)
+                test_loss = criterion(outputs, labels)
+                epoch_test_loss += test_loss.item()
+                accuracy = calculate_accuracy(outputs, labels)
+                total_accuracy += accuracy
+        
+        epoch_test_loss /= len(test_dataloader)
+        test_losses.append(epoch_test_loss)
+        total_accuracy /= len(test_dataloader)
 
-        if((epoch+1)%save_every_k==0):
-            test_loss = 0.0
-            model.eval()
-            with torch.no_grad():
-                for inputs, labels in test_dataloader:
-                    inputs, labels = inputs.to(device), labels.to(device)#move data to gpu
-                    labels = labels.float()
-                    inputs = inputs.float()
-                    outputs = model(inputs)
-                    loss_for_print = criterion(outputs, labels)
-                    loss_for_print = loss_for_print.cpu()
-                    test_loss += loss_for_print.item()
-            avg_train_loss = loss_sum / len(train_dataloader)
-            avg_test_loss = test_loss / len(test_dataloader)
-            train_losses.append(avg_train_loss)          
-            test_losses.append(avg_test_loss)
+        scheduler.step()
 
-            if avg_test_loss < best_model_loss:
-                best_model_loss = avg_test_loss
-                torch.save(model, f'{run_directory}/model_best.tar')
-            torch.save(model, f'{run_directory}/model_{epoch+1}.tar')
-    np.savez(f'{run_directory}/losses.npz',name1=train_losses,name2=test_losses)
+        print(f'Epoch {epoch+1} from {num_epochs}, Train Loss: {epoch_train_loss}, Test Loss: {epoch_test_loss}, ')
+        print(f"Accuracy after Epoch {epoch + 1}: {total_accuracy * 100:.2f}%, Aprox. Time left: {remainig_minutes} minutes")
+
+        if (epoch + 1) % 10 == 0:  # Every 10 epochs, save the loss graph
+            plt.figure(figsize=(10, 5))
+            plt.plot(range(1, epoch + 2), train_losses, label='Train Loss')
+            plt.plot(range(1, epoch + 2), test_losses, label='Test Loss')
+            plt.xlabel('Epochs')
+            plt.ylabel('Loss')
+            plt.legend()
+            plt.title(f'Loss up to Epoch {epoch + 1}')
+            plt.savefig(f'{run_directory}/LossEpoch{epoch + 1}.png')
+            plt.close()
+
+    np.savez(f'{run_directory}/losses.npz', train_losses=train_losses, test_losses=test_losses)
 
 
-device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu')
 print(device)
 reader = H5Reader("data.h5")
 reader.normalize()
 train_dataset, test_dataset = reader.split(test_train_split)
-train_dataloader = DataLoader(train_dataset, batch_size=batch_size,  num_workers=72, shuffle=True)
-test_dataloader = DataLoader(test_dataset, batch_size=batch_size,num_workers=72, shuffle=False)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, num_workers=72, shuffle=True)
+test_dataloader = DataLoader(test_dataset, batch_size=batch_size, num_workers=72, shuffle=False)
 print("datensatz geladen und gesplittet!")
 
 train()

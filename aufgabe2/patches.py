@@ -1,31 +1,19 @@
-import datetime
 import random
-import numpy as np
 from sklearn.preprocessing import MinMaxScaler
-import joblib as jl
-import torch
 import h5py
+from torch.utils.data import Dataset
+import joblib as jl
 import os
+import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
-
-
-
-#x and y normed 0-1
-batch_size = 32 * 8
-init_lr = 0.0001
-lr_factor = 0.1
-lr_patience = 5
-kernel_size = 6
-kernel_size_2 = 5
-stride = 4
-stride_2 = 3
-padding = 1
-num_epochs = 500
-save_every_k = 10
-test_train_split = 1./5
-
+import h5py
+import os
+from sklearn.decomposition import IncrementalPCA
+import joblib
+import datetime
+import numpy as np
 
 class CustomDataset(Dataset):
     def __init__(self, hdf5_path):
@@ -33,6 +21,35 @@ class CustomDataset(Dataset):
         self.y_len = 256 * 256
         self.file = h5py.File(hdf5_path, "r")
         self.key_list = list(self.file.keys())
+        self.scaler_x = [MinMaxScaler() for _ in range(self.x_len)]
+        self.scaler_y = MinMaxScaler()
+        self.normalized = False
+
+    def normalize(self):
+        if os.path.exists("scaler_xDECON2.joblib") and os.path.exists("scaler_yDECON2.joblib"):
+            self.scaler_x = jl.load("scaler_xDECON2.joblib")
+            self.scaler_y = jl.load("scaler_yDECON2.joblib")
+        else:
+            for idx in range(len(self.key_list)):
+                datapoint = self.file[self.key_list[idx]]
+                x = datapoint["X"][:self.x_len]
+                y = (datapoint["Y"][:][:]).flatten()
+
+                # Fit all scales with x and y
+                for i in range(self.x_len):
+                    self.scaler_x[i].partial_fit(x[i].reshape(-1, 1))
+                self.scaler_y.partial_fit(y.reshape(-1, 1))
+
+            jl.dump(self.scaler_x, "scaler_xDECON2.joblib")
+            jl.dump(self.scaler_y, "scaler_yDECON2.joblib")
+
+        self.normalized = True
+
+    def denormalize_y(self, y):
+        if self.normalized:
+            for i in range(self.y_len):
+                y[i] = self.scaler_y.inverse_transform(y[i].reshape(-1, 1)).flatten()
+        return y
 
     def __len__(self):
         return len(self.key_list)
@@ -44,8 +61,14 @@ class CustomDataset(Dataset):
             datapoint = self.file[self.key_list[idx]]
 
         x = datapoint["X"][:self.x_len]
-        y = (datapoint["Y"][:][:]).flatten()[:self.y_len]
-        
+        y = (datapoint["Y"][:][:]).flatten()
+
+        # Normalize each group in x and y
+        if self.normalized:
+            for i in range(self.x_len):
+                x[i] = self.scaler_x[i].transform(x[i].reshape(-1, 1)).flatten()
+            y = self.scaler_y.transform(y.reshape(-1,1)).flatten()
+
         return x, y
 
     def split(self, anteil_test):
@@ -56,7 +79,6 @@ class CustomDataset(Dataset):
         train_keys = keys[split_index:]
 
         return CustomView(self, train_keys), CustomView(self, test_keys)
-
 
 class CustomView(Dataset):
     def __init__(self, my_reader, key_list):
@@ -69,59 +91,61 @@ class CustomView(Dataset):
     def __getitem__(self, idx):
         return self.reader[self.key_list[idx]]
 
-class ParameterToImage(nn.Module):
+batch_size = 64
+num_epochs = 200
+save_every_k = 10
+init_lr = 0.0001
+test_train_split = 1./5
+
+class SubNet(nn.Module):
     def __init__(self):
-        super(ParameterToImage, self).__init__()
-
+        super(SubNet, self).__init__()
         self.fc = nn.Sequential(
-            nn.Linear(7, 256),
-            nn.ReLU()
+        nn.Linear(7, 32),
+        nn.LeakyReLU(),
         )
-
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(256, 128, kernel_size=kernel_size, stride=stride, padding=padding),
-            nn.ReLU(),
-            nn.ConvTranspose2d(128, 64, kernel_size=kernel_size, stride=stride, padding=padding),
-            nn.ReLU(),
-            nn.ConvTranspose2d(64, 32, kernel_size=kernel_size, stride=stride, padding=padding),
-            nn.ReLU(),
-            nn.ConvTranspose2d(32, 1, kernel_size=kernel_size, stride=stride, padding=padding),
+        self.conv = nn.Sequential(
+        nn.ConvTranspose2d(32,16, kernel_size = 4, stride = 2, padding = 1), #2
+        nn.LeakyReLU(),
+        nn.ConvTranspose2d(16,8, kernel_size = 4, stride = 2, padding = 1), #4
+        nn.LeakyReLU(),
+        nn.ConvTranspose2d(8,4, kernel_size = 4, stride = 2, padding = 1), #8
+        nn.LeakyReLU(),
+        nn.ConvTranspose2d(4,1, kernel_size = 6, stride = 4, padding = 1), #16
+        nn.LeakyReLU(),
         )
-
+        self.conv.apply(self.init_weights)
+    
+    def init_weights(self, m):
+        if type(m) == nn.Linear:
+            nn.init.xavier_normal_(m.weight)
+        
     def forward(self, x):
         x = self.fc(x)
-        x = x.view(x.size(0), 256, 1, 1)
-        x = self.decoder(x)
-        x=x.view(x.size(0),-1)
+        x = x.view(x.size(0),32,1,1)
+        x = self.conv(x)
+        x = x.view(x.size(0),-1)
+        #print(x.size())
         return x
-    
-def writeParamFile(file):
-    file.write("Params:\n")
-    file.write("batch_size = " + str(batch_size) + "\n")
-    file.write("init_lr = " + str(init_lr) + "\n")
-    file.write("lr_factor = " + str(lr_factor) + "\n")
-    file.write("lr_patience = " + str(lr_patience) + "\n")
-    file.write("kernel_size = " + str(kernel_size) + "\n")
-    file.write("kernel_size_2 = " + str(kernel_size_2) + "\n")
-    file.write("stride = " + str(stride) + "\n")
-    file.write("stride_2 = " + str(stride_2) + "\n")
-    file.write("padding = " + str(padding) + "\n")
-    file.write("num_epochs = " + str(num_epochs) + "\n")
-    file.write("save_every_k = " + str(save_every_k) + "\n")
-    file.write("test_train_split = " + str(test_train_split) + "\n")
+
+class MainNet(nn.Module):
+    def __init__(self, num_subnets=64):
+        super(MainNet, self).__init__()
+        self.subnets = nn.ModuleList([SubNet() for _ in range(num_subnets)])
+        
+    def forward(self, x):
+        outputs = [net(x) for net in self.subnets]
+        return torch.cat(outputs, dim=1)
 
 def train():
-    model = ParameterToImage()
+    model = MainNet()
     model.to(device)
     criterion = nn.MSELoss()
-    optimizer = optim.AdamW(model.parameters(), lr=init_lr, weight_decay=0.01)
-    schedular = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=lr_factor, patience=lr_patience)
+    optimizer = optim.Adam(model.parameters(), lr = init_lr)
+    schedular = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min')
     last_time = datetime.datetime.now()
     run_directory = last_time.strftime("%d.%m.%y, %H:%M:%S")
     os.mkdir(run_directory)
-    file = open(f'{run_directory}/params.txt','w')
-    writeParamFile(file)
-    file.close()
     train_losses = []
     test_losses = []
     best_model_loss = 1e10
@@ -138,6 +162,7 @@ def train():
             labels = labels.float()
             optimizer.zero_grad()
             outputs = model(inputs)
+            #print(outputs.size())
             loss = criterion(outputs, labels)
             loss_sum += loss.item()
             loss.backward()
@@ -151,7 +176,7 @@ def train():
         minutes = timediff.total_seconds()/60
         remainig_minutes = minutes * (num_epochs - epoch)
 
-        print(f'Epoch {epoch+1} from {num_epochs}, Loss: {loss.item()}, Aprox. Time left: {remainig_minutes}min')
+        print(f'Epoch {epoch+1} from {num_epochs}, Loss: {loss.item():.8f}, Learning Rate: {optimizer.param_groups[0]["lr"]:.8f}, Aprox. Time left: {remainig_minutes :.1f}min')
 
         if((epoch+1)%save_every_k==0):
             test_loss = 0.0
@@ -176,15 +201,15 @@ def train():
             torch.save(model, f'{run_directory}/model_{epoch+1}.tar')
     np.savez(f'{run_directory}/losses.npz',name1=train_losses,name2=test_losses)
 
-    
-
 
 device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu')
 print(device)
-data = CustomDataset("../../../../../../../../../glusterfs/dfs-gfs-dist/feuforsp/rzp-1_sphere1mm_train_2million.h5")
+data = CustomDataset("data2m.h5")
+print("h5 geladen")
+data.normalize()
 train_data, test_data = data.split(test_train_split)
+print("split erfolgt")
 train_dataloader = DataLoader(train_data, batch_size=batch_size,  num_workers=72, shuffle=True)
 test_dataloader = DataLoader(test_data, batch_size=batch_size,num_workers=72, shuffle=False)
 print("datensatz geladen und gesplittet!")
 train()
-

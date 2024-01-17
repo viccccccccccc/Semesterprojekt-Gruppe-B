@@ -33,6 +33,74 @@ class CustomDataset(Dataset):
         self.y_len = 256 * 256
         self.file = h5py.File(hdf5_path, "r")
         self.key_list = list(self.file.keys())
+        self.scalers_x = [MinMaxScaler() for _ in range(self.x_len)]
+        self.scaler_y = [MinMaxScaler() for _ in range(self.y_len)]
+        self.normalized = False
+        
+
+    def normalize(self):
+        bs=1000
+        if os.path.exists("scaler_xDECON3.joblib") and os.path.exists("scaler_yDECON3.joblib"):
+            self.scalers_x = jl.load("scaler_xDECON3.joblib")
+            self.scaler_y = jl.load("scaler_yDECON3.joblib")
+        else:
+            num_batches = int(len(self.key_list) //bs)
+            for b in range(num_batches):
+                start = b * bs
+                end = start + bs
+                batch_keys = self.key_list[start:end]
+                
+                x_batch = []
+                y_batch = []
+                for key in batch_keys:
+                    datapoint = self.file[key]
+                    x = datapoint["X"][:self.x_len]
+                    y = (datapoint["Y"][:][:]).flatten()
+                    x_batch.append(x)
+                    y_batch.append(y)
+
+                x_batch = np.array(x_batch)
+                y_batch = np.array(y_batch)
+
+                # Fit all scales with x and y
+                for i in range(self.x_len):
+                    self.scalers_x[i].partial_fit(x_batch[:, i].reshape(-1, 1))
+                for i in range(self.y_len):
+                    self.scaler_y[i].partial_fit(y_batch[:, i].reshape(-1, 1))
+
+            # If there are any remaining data points that didn't fit into a full batch
+            if len(self.key_list) % bs != 0:
+                start = num_batches * bs
+                batch_keys = self.key_list[start:]
+                
+                x_batch = []
+                y_batch = []
+                for key in batch_keys:
+                    datapoint = self.file[key]
+                    x = datapoint["X"][:self.x_len]
+                    y = (datapoint["Y"][:][:]).flatten()
+                    x_batch.append(x)
+                    y_batch.append(y)
+
+                x_batch = np.array(x_batch)
+                y_batch = np.array(y_batch)
+
+                # Fit all scales with x and y
+                for i in range(self.x_len):
+                    self.scalers_x[i].partial_fit(x_batch[:, i].reshape(-1, 1))
+                for i in range(self.y_len):
+                    self.scaler_y[i].partial_fit(y_batch[:, i].reshape(-1, 1))
+
+            jl.dump(self.scalers_x, "scaler_xDECON3.joblib")
+            jl.dump(self.scaler_y, "scaler_yDECON3.joblib")
+
+        self.normalized = True
+
+    def denormalize_y(self, y):
+        if self.normalized:
+            for i in range(self.y_len):
+                y[i] = self.scaler_y[i].inverse_transform(y[i].reshape(-1, 1)).flatten()
+        return y
 
     def __len__(self):
         return len(self.key_list)
@@ -44,8 +112,15 @@ class CustomDataset(Dataset):
             datapoint = self.file[self.key_list[idx]]
 
         x = datapoint["X"][:self.x_len]
-        y = (datapoint["Y"][:][:]).flatten()[:self.y_len]
-        
+        y = (datapoint["Y"][:][:]).flatten()
+
+        # Normalize each group in x and y
+        if self.normalized:
+            for i in range(self.x_len):
+                x[i] = self.scalers_x[i].transform(x[i].reshape(-1, 1)).flatten()
+            for i in range(self.y_len):
+                y[i] = self.scaler_y[i].transform(y[i].reshape(-1, 1)).flatten()
+
         return x, y
 
     def split(self, anteil_test):
@@ -56,7 +131,6 @@ class CustomDataset(Dataset):
         train_keys = keys[split_index:]
 
         return CustomView(self, train_keys), CustomView(self, test_keys)
-
 
 class CustomView(Dataset):
     def __init__(self, my_reader, key_list):
@@ -182,6 +256,7 @@ def train():
 device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu')
 print(device)
 data = CustomDataset("../../../../../../../../../glusterfs/dfs-gfs-dist/feuforsp/rzp-1_sphere1mm_train_2million.h5")
+data.normalize()
 train_data, test_data = data.split(test_train_split)
 train_dataloader = DataLoader(train_data, batch_size=batch_size,  num_workers=72, shuffle=True)
 test_dataloader = DataLoader(test_data, batch_size=batch_size,num_workers=72, shuffle=False)

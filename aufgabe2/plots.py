@@ -37,4 +37,4 @@ def plotte_krasse_sachen(losses):
 
 
 
-plotte_krasse_sachen(np.load(f'21.12.23, 11:39:41/losses.npz'))
+plotte_krasse_sachen(np.load(f'10.01.24, 12:36:05/losses.npz'))

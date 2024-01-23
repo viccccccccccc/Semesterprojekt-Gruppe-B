@@ -1,36 +1,30 @@
-import datetime
 import random
-import numpy as np
 from sklearn.preprocessing import MinMaxScaler
-import joblib as jl
-import torch
 import h5py
+from torch.utils.data import Dataset
+import joblib as jl
 import os
+import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
+import h5py
+import os
+from sklearn.decomposition import IncrementalPCA
+import joblib
+import datetime
+import numpy as np
 
-
-
-#x and y normed 0-1
-batch_size = 32 * 8
-init_lr = 0.0001
-lr_factor = 0.1
-lr_patience = 5
-kernel_size = 6
-kernel_size_2 = 5
-stride = 4
-stride_2 = 3
-padding = 1
+batch_size = 64
 num_epochs = 500
 save_every_k = 10
+init_lr = 0.0001
 test_train_split = 1./5
-
 
 class CustomDataset(Dataset):
     def __init__(self, hdf5_path):
         self.x_len = 7
-        self.y_len = 256 * 256
+        self.y_len = 256
         self.file = h5py.File(hdf5_path, "r")
         self.key_list = list(self.file.keys())
         self.scaler_x = [MinMaxScaler() for _ in range(self.x_len)]
@@ -38,9 +32,9 @@ class CustomDataset(Dataset):
         self.normalized = False
 
     def normalize(self):
-        if os.path.exists("scaler_xDECON2.joblib") and os.path.exists("scaler_yDECON2.joblib"):
-            self.scaler_x = jl.load("scaler_xDECON2.joblib")
-            self.scaler_y = jl.load("scaler_yDECON2.joblib")
+        if os.path.exists("scaler_xPCA.joblib") and os.path.exists("scaler_yPCA.joblib"):
+            self.scaler_x = jl.load("scaler_xPCA.joblib")
+            self.scaler_y = jl.load("scaler_yPCA.joblib")
         else:
             for idx in range(len(self.key_list)):
                 datapoint = self.file[self.key_list[idx]]
@@ -52,8 +46,8 @@ class CustomDataset(Dataset):
                     self.scaler_x[i].partial_fit(x[i].reshape(-1, 1))
                 self.scaler_y.partial_fit(y.reshape(-1, 1))
 
-            jl.dump(self.scaler_x, "scaler_xDECON2.joblib")
-            jl.dump(self.scaler_y, "scaler_yDECON2.joblib")
+            jl.dump(self.scaler_x, "scaler_xPCA.joblib")
+            jl.dump(self.scaler_y, "scaler_yPCA.joblib")
 
         self.normalized = True
 
@@ -91,9 +85,7 @@ class CustomDataset(Dataset):
         train_keys = keys[split_index:]
 
         return CustomView(self, train_keys), CustomView(self, test_keys)
-
-
-
+    
 class CustomView(Dataset):
     def __init__(self, my_reader, key_list):
         self.reader = my_reader
@@ -105,43 +97,32 @@ class CustomView(Dataset):
     def __getitem__(self, idx):
         return self.reader[self.key_list[idx]]
 
-class ParameterToImage(nn.Module):
+
+class MLP(nn.Module):
     def __init__(self):
-        super(ParameterToImage, self).__init__()
-
+        super(MLP, self).__init__()
         self.fc = nn.Sequential(
-            nn.Linear(7, 256),
-            nn.ReLU()
-        )
-
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(256, 128, kernel_size=kernel_size, stride=stride, padding=padding),
-            nn.ReLU(),
-            nn.ConvTranspose2d(128, 64, kernel_size=kernel_size, stride=stride, padding=padding),
-            nn.ReLU(),
-            nn.ConvTranspose2d(64, 32, kernel_size=kernel_size, stride=stride, padding=padding),
-            nn.ReLU(),
-            nn.ConvTranspose2d(32, 1, kernel_size=kernel_size, stride=stride, padding=padding),
+            nn.Linear(7, 32),
+            nn.LeakyReLU(),
+            nn.Linear(32, 128),
+            nn.LeakyReLU(),
+            nn.Linear(128, 512),
+            nn.LeakyReLU(),
+            nn.Linear(512, 2048),
+            nn.LeakyReLU(),
+            nn.Linear(2048, 4096),
+            nn.LeakyReLU(),
+            nn.Linear(4096, 256),
+    
         )
 
     def forward(self, x):
-        x = self.fc(x)
-        x = x.view(x.size(0), 256, 1, 1)
-        x = self.decoder(x)
-        x=x.view(x.size(0),-1)
-        return x
-    
+        return self.fc(x)
+
 def writeParamFile(file):
     file.write("Params:\n")
     file.write("batch_size = " + str(batch_size) + "\n")
     file.write("init_lr = " + str(init_lr) + "\n")
-    file.write("lr_factor = " + str(lr_factor) + "\n")
-    file.write("lr_patience = " + str(lr_patience) + "\n")
-    file.write("kernel_size = " + str(kernel_size) + "\n")
-    file.write("kernel_size_2 = " + str(kernel_size_2) + "\n")
-    file.write("stride = " + str(stride) + "\n")
-    file.write("stride_2 = " + str(stride_2) + "\n")
-    file.write("padding = " + str(padding) + "\n")
     file.write("num_epochs = " + str(num_epochs) + "\n")
     file.write("save_every_k = " + str(save_every_k) + "\n")
     file.write("test_train_split = " + str(test_train_split) + "\n")
@@ -149,14 +130,13 @@ def writeParamFile(file):
 def train(model):
     model.to(device)
     criterion = nn.MSELoss()
-    optimizer = optim.AdamW(model.parameters(), lr=init_lr, weight_decay=0.01)
-    schedular = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=lr_factor, patience=lr_patience)
+    optimizer = optim.Adam(model.parameters(), lr = init_lr)
+    schedular = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min')
     last_time = datetime.datetime.now()
     run_directory = last_time.strftime("%d.%m.%y, %H:%M:%S")
     os.mkdir(run_directory)
     file = open(f'{run_directory}/params.txt','w')
     writeParamFile(file)
-    file.close()
     train_losses = []
     test_losses = []
     best_model_loss = 1e10
@@ -166,7 +146,6 @@ def train(model):
     for epoch in range(num_epochs):
         loss_sum = 0
         #loss_sum = loss_sum.to(device)
-        
         for inputs, labels in train_dataloader:
             #print(inputs.size())
             inputs, labels = inputs.to(device), labels.to(device)
@@ -180,6 +159,7 @@ def train(model):
             optimizer.step()
             schedular.step(loss)
         #loss_sum = loss_sum.cpu()
+        
         now = last_time
         last_time = datetime.datetime.now()
         timediff = last_time - now
@@ -211,17 +191,15 @@ def train(model):
             torch.save(model, f'{run_directory}/model_{epoch+1}.tar')
     np.savez(f'{run_directory}/losses.npz',name1=train_losses,name2=test_losses)
 
-    
-
 
 device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu')
 print(device)
-data = CustomDataset("data2m.h5")
+data = CustomDataset("../../../../../../../../../vol/tmp/gruppe_b/pca256.h5")
 data.normalize()
 train_data, test_data = data.split(test_train_split)
 train_dataloader = DataLoader(train_data, batch_size=batch_size,  num_workers=72, shuffle=True)
 test_dataloader = DataLoader(test_data, batch_size=batch_size,num_workers=72, shuffle=False)
 print("datensatz geladen und gesplittet!")
-#model = ParameterToImage()
-model = torch.load("17.01.24, 14:11:39/model_best.tar")
+#model = MLP()
+model = torch.load("18.01.24, 13:16:29/model_best.tar")
 train(model)

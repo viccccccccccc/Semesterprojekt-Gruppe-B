@@ -16,15 +16,15 @@ matplotlib.use("Agg")
 
 
 
-def plotte_krasse_sachen(losses):
-    print(losses['name2'])
+def plotte_krasse_sachen(lossestest,lossestrain):
+    print(lossestest)
     fig, ax = plt.subplots()
     #ax.set_ylim([max(max(losses['name1']),min(losses['name2'])), max(max(losses['name1']),max(losses['name2']))])
     ax.set_xlabel("Epoch")
     ax.set_ylabel("Loss")
     ax.set_title(f'Loss Graph')
-    ax.plot(losses['name1'], '-b',label="Train Losses")
-    ax.plot(losses['name2'], '-g',label="Test Losses")
+    ax.plot(lossestrain, '-b',label="Train Losses")
+    ax.plot(lossestest, '-g',label="Test Losses")
     ax.legend()
 
     plt.savefig(f'plots/losses.png')
@@ -34,7 +34,14 @@ def plotte_krasse_sachen(losses):
     
 
 
+files = ["18.01.24, 13:16:29_pca","22.01.24, 20:56:30_pca","24.01.24, 10:54:14_pca","30.01.24, 11:07:54_pca_no_sced"]   #pca
+
+#files = ["23.01.24, 14:29:20_deconv"]  #deconv
+arraytest = []
+arraytrain = []
+for fpath in files:
+    arraytest = np.concatenate([arraytest,np.load(f'{fpath}/losses.npz')['name2']])
+    arraytrain = np.concatenate([arraytrain,np.load(f'{fpath}/losses.npz')['name1']])
 
 
-
-plotte_krasse_sachen(np.load(f'17.01.24, 14:11:39/losses.npz'))
+plotte_krasse_sachen(arraytest,arraytrain)

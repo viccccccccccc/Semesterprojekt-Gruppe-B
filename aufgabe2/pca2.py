@@ -39,17 +39,23 @@ for key in nullen:
     data.rem_key(key)
 
 n_components = 256
-pca = IncrementalPCA(n_components=n_components,batch_size=256) #
-print("init ist fertig")
-pca.fit(data)
-joblib.dump(pca, "pca"+str(n_components)+".pkl")
-#ipca = joblib.load('ipca.pkl')
+#pca = IncrementalPCA(n_components=n_components,batch_size=256) #
+#print("init ist fertig")
+#for i in range(len(data)//256):
+#    subdata=[]
+#    if (i*256+256<len(data)):
+#        for j in range(256):
+#            subdata.append(data[i*256+j])
+#        pca.partial_fit(subdata)
+#joblib.dump(pca, "pca"+str(n_components)+".pkl")
+pca = joblib.load('pca256.pkl')
 print("fit ist fertig")
-with h5py.File("pca"+str(n_components)+".h5","w") as f:
+with h5py.File("pca"+str(n_components)+"_256x256.h5","w") as f:
     for i in range(len(data)):
         grp = f.create_group(data.get_key(i))
         y_pca = pca.transform([data[i]])
         grp.create_dataset("X", data = data.get_x(data.get_key(i)))
         grp.create_dataset("Y", data = y_pca)
+        print(i)
 
 print("alles fertig")

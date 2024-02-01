@@ -184,8 +184,7 @@ def writeParamFile(file):
     file.write("save_every_k = " + str(save_every_k) + "\n")
     file.write("test_train_split = " + str(test_train_split) + "\n")
 
-def train():
-    model = ParameterToImage()
+def train(model):
     model.to(device)
     criterion = nn.MSELoss()
     optimizer = optim.AdamW(model.parameters(), lr=init_lr, weight_decay=0.01)
@@ -261,5 +260,7 @@ train_data, test_data = data.split(test_train_split)
 train_dataloader = DataLoader(train_data, batch_size=batch_size,  num_workers=72, shuffle=True)
 test_dataloader = DataLoader(test_data, batch_size=batch_size,num_workers=72, shuffle=False)
 print("datensatz geladen und gesplittet!")
-train()
+#model = ParameterToImage()
+model = torch.load("17.01.24, 14:11:39/model_best.tar")
+train(model)
 

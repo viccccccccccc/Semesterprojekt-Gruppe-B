@@ -18,7 +18,7 @@ import numpy as np
 batch_size = 64
 num_epochs = 500
 save_every_k = 10
-init_lr = 0.0001
+init_lr = 0.000001
 test_train_split = 1./5
 
 class CustomDataset(Dataset):
@@ -134,6 +134,7 @@ def train(model):
     schedular = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min')
     last_time = datetime.datetime.now()
     run_directory = last_time.strftime("%d.%m.%y, %H:%M:%S")
+    run_directory += "_pca_good_ext"
     os.mkdir(run_directory)
     file = open(f'{run_directory}/params.txt','w')
     writeParamFile(file)
@@ -201,5 +202,5 @@ train_dataloader = DataLoader(train_data, batch_size=batch_size,  num_workers=72
 test_dataloader = DataLoader(test_data, batch_size=batch_size,num_workers=72, shuffle=False)
 print("datensatz geladen und gesplittet!")
 #model = MLP()
-model = torch.load("18.01.24, 13:16:29/model_best.tar")
+model = torch.load("30.01.24, 11:07:54_pca_no_sced/model_best.tar")
 train(model)

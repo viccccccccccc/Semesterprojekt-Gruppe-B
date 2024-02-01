@@ -214,7 +214,7 @@ def train():
     test_losses = []
 
     hdf5_path2 = "/vol/tmp/feuforsp/rzp-1_sphere1mm_train_2million.h5"
-    pca_model_path = "/vol/tmp/feuforsp/gruppe_b/pca256.pkl"
+    pca_model_path = "/vol/tmp/gruppe_b/pca256.pkl"
 
     print("anfang")
     last_time = datetime.datetime.now()
@@ -292,7 +292,7 @@ def train():
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(device)
-reader = H5Reader("/vol/tmp/feuerforsp/gruppe_b/pca256.h5")
+reader = H5Reader("/vol/tmp/gruppe_b/pca256.h5")
 reader.normalize()
 train_dataset, test_dataset = reader.split(test_train_split)
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size, num_workers=72, shuffle=True)

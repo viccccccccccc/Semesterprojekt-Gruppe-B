@@ -122,23 +122,21 @@ class MLP(nn.Module):
         return self.fc(x)
 
 
-data = CustomDataset("../../../../../../../../../vol/tmp/feuforsp/rzp-1_sphere1mm_train_2million_bin32.h5")
+#data = CustomDataset("../../../../../../../../../vol/tmp/feuforsp/rzp-1_sphere1mm_train_2million_bin32.h5")
+data = CustomDataset("data2m.h5")
 data.normalize()
 dl = DataLoader(data, batch_size=1,  num_workers=6, shuffle=True)
-model = torch.load("30.01.24, 11:07:54_pca_no_sced/model_best.tar", map_location=torch.device('cpu'))
+model = torch.load("03.02.24, 20:15:01_pca_256x256/model_best.tar", map_location=torch.device('cpu'))
 model = model.cpu()
-pca = jl.load("../../../../../../../../../vol/tmp/gruppe_b/pca256.pkl")
+#pca = jl.load("../../../../../../../../../vol/tmp/gruppe_b/pca256.pkl")
+pca = jl.load("models/pca256.pkl")
 scaler_y = jl.load("scaler_yPCA.joblib")
 filter = np.load("nullBild.npz")['name1']
 
-trueNegative=0
-truePositive=0
-falseNegative=0
-falsePositive=0
-
-for i in range(len(dl)):
+sum=0
+while True:
     inputs, d1 = next(iter(dl))
-    dnp = d1.numpy()
+    #dnp = d1.numpy()
     #if not np.any(dnp != 0):
         
 
@@ -152,33 +150,24 @@ for i in range(len(dl)):
         #print(outputs.shape)
         d2=pca.inverse_transform(outputs)
     
-    
+    d2[d2<0]=0
 
     #np.savez('nullBild.npz',name1=d1)
-    d1 = d1.reshape(64,64)
-    d2 = d2.reshape(64,64)
+    d1 = d1.reshape(256,256)
+    d2 = d2.reshape(256,256)
 
     #test = np.sum(abs(d2 - filter))
     test= np.max(d2)-np.min(d2)
     
-    if(test<200):
-        if not np.any(dnp != 0):
-            truePositive+=1
-        else:
-            falsePositive+=1
+    #if(test<200):
+    print(test)
 
-        #print(test)
+    sum+=1
 
-        #f, axarr = plt.subplots(1,2)
-        #axarr[0].imshow(d1)
-        #axarr[1].imshow(d2)
-        #plt.show()
-    else:
-        if not np.any(dnp != 0):
-            falseNegative+=1
-            print(test)
-        else:
-            trueNegative+=1
+    f, axarr = plt.subplots(1,2)
+    axarr[0].imshow(d1)
+    axarr[1].imshow(d2)
+    plt.show()
 
-print(f'truePositive: {truePositive}, falsePositive: {falsePositive}, trueNegative: {trueNegative}, falseNegative: {falseNegative}')
+
 

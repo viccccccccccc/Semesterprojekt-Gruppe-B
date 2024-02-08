@@ -16,7 +16,7 @@ import datetime
 import numpy as np
 
 batch_size = 64
-num_epochs = 500
+num_epochs = 1000
 save_every_k = 10
 init_lr = 0.000001
 test_train_split = 1./5
@@ -32,22 +32,20 @@ class CustomDataset(Dataset):
         self.normalized = False
 
     def normalize(self):
-        if os.path.exists("scaler_xPCA.joblib") and os.path.exists("scaler_yPCA.joblib"):
-            self.scaler_x = jl.load("scaler_xPCA.joblib")
-            self.scaler_y = jl.load("scaler_yPCA.joblib")
+        if os.path.exists("pcaneu/scaler_xPCAneu.joblib") and os.path.exists("pcaneu/scaler_yPCAneu.joblib"):
+            self.scaler_x = jl.load("pcaneu/scaler_xPCAneu.joblib")
+            self.scaler_y = jl.load("pcaneu/scaler_yPCAneu.joblib")
         else:
+            min_max=[[70,1.5,300,0,0,3000,0.5],
+                     [150,3.0,800,100,100,10000,3]]
             for idx in range(len(self.key_list)):
                 datapoint = self.file[self.key_list[idx]]
-                x = datapoint["X"][:self.x_len]
                 y = (datapoint["Y"][:][:]).flatten()
-
-                # Fit all scales with x and y
-                for i in range(self.x_len):
-                    self.scaler_x[i].partial_fit(x[i].reshape(-1, 1))
                 self.scaler_y.partial_fit(y.reshape(-1, 1))
-
-            jl.dump(self.scaler_x, "scaler_xPCA.joblib")
-            jl.dump(self.scaler_y, "scaler_yPCA.joblib")
+            for i in range(self.x_len):
+                self.scaler_x[i].fit([[min_max[0][i]],[min_max[1][i]]])
+            jl.dump(self.scaler_x, "pcaneu/scaler_xPCAneu.joblib")
+            jl.dump(self.scaler_y, "pcaneu/scaler_yPCAneu.joblib")
 
         self.normalized = True
 
@@ -131,10 +129,9 @@ def train(model):
     model.to(device)
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr = init_lr)
-    schedular = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min')
     last_time = datetime.datetime.now()
     run_directory = last_time.strftime("%d.%m.%y, %H:%M:%S")
-    run_directory += "_pca_good_ext"
+    run_directory += "_pca_64x64_clean"
     os.mkdir(run_directory)
     file = open(f'{run_directory}/params.txt','w')
     writeParamFile(file)
@@ -158,7 +155,6 @@ def train(model):
             loss_sum += loss.item()
             loss.backward()
             optimizer.step()
-            schedular.step(loss)
         #loss_sum = loss_sum.cpu()
         
         now = last_time
@@ -195,12 +191,12 @@ def train(model):
 
 device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu')
 print(device)
-data = CustomDataset("../../../../../../../../../vol/tmp/gruppe_b/pca256.h5")
+data = CustomDataset("pcaneu/pca256_64x64_w0.h5")
 data.normalize()
 train_data, test_data = data.split(test_train_split)
 train_dataloader = DataLoader(train_data, batch_size=batch_size,  num_workers=72, shuffle=True)
 test_dataloader = DataLoader(test_data, batch_size=batch_size,num_workers=72, shuffle=False)
 print("datensatz geladen und gesplittet!")
-#model = MLP()
-model = torch.load("30.01.24, 11:07:54_pca_no_sced/model_best.tar")
+model = MLP()
+#model = torch.load("30.01.24, 11:07:54_pca_no_sced/model_best.tar")
 train(model)

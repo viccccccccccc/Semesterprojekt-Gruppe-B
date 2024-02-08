@@ -26,32 +26,23 @@ class CustomDataset(Dataset):
         datapoint = self.file[key]
         return datapoint["X"][:]
     
-data = CustomDataset("data2m.h5")
+data = CustomDataset("../../../../../../../../../../vol/tmp/feuforsp/rzp-1_sphere1mm_train_2million_bin32.h5")
 
-nullen = []
-for i in range(len(data)):
-    y = data[i]
-    if not np.any(y != 0):
-        #key = data.get_key(i)
-        #nullen.append(key)
-        y[y==0] = 1
 
-#for key in nullen:
-    #data.rem_key(key)
 
 n_components = 256
-#pca = IncrementalPCA(n_components=n_components,batch_size=256) #
-#print("init ist fertig")
+pca = IncrementalPCA(n_components=n_components,batch_size=256) #
+print("init ist fertig")
 #for i in range(len(data)//256):
-#    subdata=[]
-#    if (i*256+256<len(data)):
-#        for j in range(256):
-#            subdata.append(data[i*256+j])
-#        pca.partial_fit(subdata)
+    #subdata=[]
+    #if (i*256+256<len(data)):
+        #for j in range(256):
+            #subdata.append(data[i*256+j]+1)
+        #pca.partial_fit(subdata)
 #joblib.dump(pca, "pca"+str(n_components)+".pkl")
-pca = joblib.load('pca256.pkl')
+pca = joblib.load('pca256_64x64_w0.pkl')
 print("fit ist fertig")
-with h5py.File("pca"+str(n_components)+"_256x256.h5","w") as f:
+with h5py.File("pca"+str(n_components)+"_64x64_w0.h5","w") as f:
     for i in range(len(data)):
         grp = f.create_group(data.get_key(i))
         y_pca = pca.transform([data[i]])

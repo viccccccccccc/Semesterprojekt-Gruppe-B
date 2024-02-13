@@ -24,9 +24,9 @@ class CustomDataset(Dataset):
         self.normalized = False
 
     def normalize(self):
-        if os.path.exists("scaler_xDECON2.joblib") and os.path.exists("scaler_yDECON2.joblib"):
-            self.scaler_x = jl.load("scaler_xDECON2.joblib")
-            self.scaler_y = jl.load("scaler_yDECON2.joblib")
+        if os.path.exists("pcaneu/scaler_xPCAneu.joblib") and os.path.exists("pcaneu/scaler_yPCAneu.joblib"):
+            self.scaler_x = jl.load("pcaneu/scaler_xPCAneu.joblib")
+            self.scaler_y = jl.load("pcaneu/scaler_yPCAneu.joblib")
         else:
             for idx in range(len(self.key_list)):
                 datapoint = self.file[self.key_list[idx]]
@@ -122,22 +122,22 @@ class MLP(nn.Module):
         return self.fc(x)
 
 
-#data = CustomDataset("../../../../../../../../../vol/tmp/feuforsp/rzp-1_sphere1mm_train_2million_bin32.h5")
-data = CustomDataset("data2m.h5")
+data = CustomDataset("../../../../../../../../../vol/tmp/feuforsp/rzp-1_sphere1mm_train_2million_bin32.h5")
+#data = CustomDataset("data2m.h5")
 data.normalize()
 dl = DataLoader(data, batch_size=1,  num_workers=6, shuffle=True)
-model = torch.load("03.02.24, 20:15:01_pca_256x256/model_best.tar", map_location=torch.device('cpu'))
+model = torch.load("pcaneu/model_best.tar", map_location=torch.device('cpu'))
 model = model.cpu()
 #pca = jl.load("../../../../../../../../../vol/tmp/gruppe_b/pca256.pkl")
-pca = jl.load("models/pca256.pkl")
-scaler_y = jl.load("scaler_yPCA.joblib")
-filter = np.load("nullBild.npz")['name1']
+pca = jl.load("pcaneu/pca256_64x64_w0.pkl")
+scaler_y = jl.load("pcaneu/scaler_yPCAneu.joblib")
+#filter = np.load("nullBild.npz")['name1']
 
 sum=0
 while True:
     inputs, d1 = next(iter(dl))
-    #dnp = d1.numpy()
-    #if not np.any(dnp != 0):
+    dnp = d1.numpy()
+    
         
 
     with torch.no_grad():
@@ -150,23 +150,30 @@ while True:
         #print(outputs.shape)
         d2=pca.inverse_transform(outputs)
     
-    d2[d2<0]=0
+    d2 = d2-1
+    d2[d2<0.2]=0
 
     #np.savez('nullBild.npz',name1=d1)
-    d1 = d1.reshape(256,256)
-    d2 = d2.reshape(256,256)
+    d1 = d1.reshape(64,64)
+    d2 = d2.reshape(64,64)
 
     #test = np.sum(abs(d2 - filter))
-    test= np.max(d2)-np.min(d2)
+    #test= np.max(d2)-np.min(d2)
     
     #if(test<200):
-    print(test)
+    #print(test)
 
-    sum+=1
+    #sum+=1
 
-    f, axarr = plt.subplots(1,2)
+    f, axarr = plt.subplots(2,1,figsize=(6, 12))
+    
     axarr[0].imshow(d1)
+    axarr[0].set_title("Original")
+    axarr[0].axis('off')
     axarr[1].imshow(d2)
+    axarr[1].set_title("Generiert")
+    axarr[1].axis('off')
+    plt.tight_layout()
     plt.show()
 
 

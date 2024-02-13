@@ -37,7 +37,9 @@ def plotte_krasse_sachen(lossestest,lossestrain):
 #files = ["18.01.24, 13:16:29_pca","22.01.24, 20:56:30_pca","24.01.24, 10:54:14_pca","30.01.24, 11:07:54_pca_no_sced","01.02.24, 11:16:06_pca_good_ext"]   #pca
 
 #files = ["23.01.24, 14:29:20_deconv"]  #deconv
-files = ["03.02.24, 20:15:01_pca_256x256"]
+#files = ["03.02.24, 20:15:01_pca_256x256"]
+
+files = ["07.02.24, 23:31:48_pca_64x64_clean"]
 arraytest = []
 arraytrain = []
 for fpath in files:

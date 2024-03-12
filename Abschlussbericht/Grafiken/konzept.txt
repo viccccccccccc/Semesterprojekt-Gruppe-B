@@ -1,0 +1,1 @@
+Das Konzept MLP in Verbindung mit Dimensionsreduktion

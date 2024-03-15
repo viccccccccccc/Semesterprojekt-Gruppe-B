@@ -1,0 +1,1 @@
+genutzter Loss-Wert, sowie Optimizer und Scheduler
